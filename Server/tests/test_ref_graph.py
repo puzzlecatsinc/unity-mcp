@@ -198,14 +198,29 @@ class TestRefGraph:
 
     def test_diff_modified(self):
         self.graph.ingest_snapshot("S", _sample_objects(2, start_id=10))
-        # Re-ingest same objects (they get new refs with higher revision)
-        self.graph.ingest_snapshot("S", _sample_objects(2, start_id=10))
+
+        updated = _sample_objects(2, start_id=10)
+        updated[1]["active"] = False
+        self.graph.ingest_snapshot("S", updated)
 
         diff = self.graph.diff(1, 2)
-        # Existing objects re-ingested should appear as modified
         modified_ids = [parse_uref(r)[1] for r in diff["modified"] if parse_uref(r)]
-        assert 10 in modified_ids
-        assert 11 in modified_ids
+        assert modified_ids == [11]
+
+    def test_diff_removed_is_correct_and_deterministic(self):
+        baseline = _sample_objects(3, start_id=10)
+        # Intentionally ingest out of order to verify deterministic diff output.
+        self.graph.ingest_snapshot("S", [baseline[2], baseline[0], baseline[1]])
+
+        next_snapshot = [baseline[0], _sample_objects(1, start_id=13)[0]]
+        self.graph.ingest_snapshot("S", next_snapshot)
+
+        diff = self.graph.diff(1, 2)
+        removed_ids = [parse_uref(r)[1] for r in diff["removed"] if parse_uref(r)]
+        added_ids = [parse_uref(r)[1] for r in diff["added"] if parse_uref(r)]
+
+        assert removed_ids == [11, 12]
+        assert added_ids == [13]
 
     def test_skips_objects_without_instance_id(self):
         objs = [{"name": "NoId", "path": "/NoId"}]
@@ -229,6 +244,16 @@ class TestSnapshotStore:
         s1 = SnapshotStore.get_instance()
         s2 = SnapshotStore.get_instance()
         assert s1 is s2
+
+    def test_scoped_instances_are_isolated(self):
+        a = SnapshotStore.get_instance("unity-a")
+        b = SnapshotStore.get_instance("unity-b")
+
+        assert a is not b
+
+        a.ingest("SceneA", _sample_objects(1, start_id=1))
+        assert a.current_revision == 1
+        assert b.current_revision == 0
 
     def test_reset(self):
         s1 = SnapshotStore.get_instance()
@@ -260,12 +285,16 @@ class TestSnapshotStore:
         assert self.store.get_revision(999) is None
 
     def test_history_bounded(self):
-        store = SnapshotStore()
-        store._max_history = 5
+        store = SnapshotStore(max_history=5)
         for i in range(10):
             store.ingest("S", _sample_objects(1, start_id=i * 10))
+
         assert len(store.revisions) == 5
         assert store.revisions[0].revision == 6  # oldest kept
+        # RefGraph entries from trimmed revisions should also be pruned.
+        assert store.ref_graph.entry_count == 5
+        assert store.has_revision(5) is False
+        assert store.has_revision(6) is True
 
     def test_diff_delegates(self):
         self.store.ingest("S", _sample_objects(2, start_id=10))
@@ -274,6 +303,15 @@ class TestSnapshotStore:
         assert "added" in diff
         assert "modified" in diff
         assert "removed" in diff
+
+    def test_diff_raises_when_revision_pruned(self):
+        store = SnapshotStore(max_history=2)
+        store.ingest("S", _sample_objects(1, start_id=1))
+        store.ingest("S", _sample_objects(1, start_id=2))
+        store.ingest("S", _sample_objects(1, start_id=3))
+
+        with pytest.raises(ValueError):
+            store.diff(1, 3)
 
     def test_revision_to_dict(self):
         rev = self.store.ingest("S", _sample_objects(1))

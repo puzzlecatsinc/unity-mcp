@@ -203,12 +203,24 @@ class TestSnapshotDiff:
     def test_diff_detects_modified_objects(self):
         store = SnapshotStore.get_instance()
         store.ingest("S", _sample_objects(2, start_id=10))
-        store.ingest("S", _sample_objects(2, start_id=10))
+
+        updated = _sample_objects(2, start_id=10)
+        updated[0]["path"] = "/Root/Renamed"
+        store.ingest("S", updated)
 
         diff = store.diff(1, 2)
         modified_ids = [parse_uref(r)[1] for r in diff["modified"] if parse_uref(r)]
-        assert 10 in modified_ids
-        assert 11 in modified_ids
+        assert modified_ids == [10]
+
+    def test_diff_detects_removed_objects(self):
+        store = SnapshotStore.get_instance()
+        first = _sample_objects(3, start_id=10)
+        store.ingest("S", first)
+        store.ingest("S", [first[0]])
+
+        diff = store.diff(1, 2)
+        removed_ids = [parse_uref(r)[1] for r in diff["removed"] if parse_uref(r)]
+        assert removed_ids == [11, 12]
 
     def test_diff_defaults_to_current_revision(self):
         store = SnapshotStore.get_instance()

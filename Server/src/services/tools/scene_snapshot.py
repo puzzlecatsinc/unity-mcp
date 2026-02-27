@@ -135,7 +135,7 @@ async def scene_snapshot_capture(
                 "success": False,
                 "message": "root_ref is required when scope='subtree'.",
             }
-        store = SnapshotStore.get_instance()
+        store = SnapshotStore.get_instance(unity_instance)
         from services.snapshot.ref_graph import parse_uref
         parsed = parse_uref(root_ref)
         if parsed is None:
@@ -173,7 +173,7 @@ async def scene_snapshot_capture(
         scene_name = "TestScene"
         objects = []
 
-    store = SnapshotStore.get_instance()
+    store = SnapshotStore.get_instance(unity_instance)
     revision = store.ingest(
         scene_name,
         objects,
@@ -244,7 +244,8 @@ async def scene_snapshot_diff(
 
     to_rev = coerce_int(to_revision)
 
-    store = SnapshotStore.get_instance()
+    unity_instance = get_unity_instance_from_context(ctx)
+    store = SnapshotStore.get_instance(unity_instance)
 
     if from_rev < 0 or from_rev > store.current_revision:
         return {
@@ -253,13 +254,37 @@ async def scene_snapshot_diff(
                        f"Current revision: {store.current_revision}.",
         }
 
+    if from_rev != 0 and not store.has_revision(from_rev):
+        return {
+            "success": False,
+            "message": (
+                f"from_revision {from_rev} is no longer available. "
+                f"Oldest available revision: {store.oldest_revision}."
+            ),
+        }
+
     if to_rev is not None and (to_rev < from_rev or to_rev > store.current_revision):
         return {
             "success": False,
             "message": f"to_revision {to_rev} is out of range.",
         }
 
-    diff = store.diff(from_rev, to_rev)
+    if to_rev is not None and to_rev != 0 and not store.has_revision(to_rev):
+        return {
+            "success": False,
+            "message": (
+                f"to_revision {to_rev} is no longer available. "
+                f"Oldest available revision: {store.oldest_revision}."
+            ),
+        }
+
+    try:
+        diff = store.diff(from_rev, to_rev)
+    except ValueError as exc:
+        return {
+            "success": False,
+            "message": str(exc),
+        }
 
     return {
         "success": True,

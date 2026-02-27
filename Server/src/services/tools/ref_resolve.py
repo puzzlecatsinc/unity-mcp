@@ -14,6 +14,7 @@ from pydantic import Field
 
 from services.registry import mcp_for_unity_tool
 from services.snapshot import SnapshotStore, RefStatus
+from services.tools import get_unity_instance_from_context
 
 
 @mcp_for_unity_tool(
@@ -48,7 +49,8 @@ async def ref_resolve(
             "message": "Missing required parameter 'ref'. Provide a uRef string.",
         }
 
-    store = SnapshotStore.get_instance()
+    unity_instance = get_unity_instance_from_context(ctx)
+    store = SnapshotStore.get_instance(unity_instance)
     status, entry, reason = store.ref_graph.resolve(ref.strip())
 
     result: dict[str, Any] = {
