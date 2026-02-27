@@ -46,11 +46,12 @@ These are pure mirrors. Run `scripts/sync-upstream.sh` to update them.
 
 ### Our branches
 
-| Branch                        | Based on        | Purpose                                    |
-|-------------------------------|-----------------|---------------------------------------------|
-| `main`                        | `upstream-beta` | Our integration branch. All features merge here. |
-| `feature/openclaw-vnext-plan` | `main`          | Current planning branch (commit `24544c3`)  |
-| `feature/<workstream>`        | `main`          | Per-workstream dev branches                 |
+| Branch                        | Based on        | Purpose                                    | Status |
+|-------------------------------|-----------------|---------------------------------------------|--------|
+| `main`                        | `upstream-beta` | Our integration branch. All features merge here. | Active |
+| `feature/openclaw-vnext-plan` | `main`          | Planning + docs branch                      | Active |
+| `feat/phase1-snapshot-ref`    | `main`          | Phase 1A: snapshot capture, ref graph, ref resolve | ⚠️ Needs hardening (H-1, H-3, H-4) |
+| `feat/phase1-wait-primitives` | `main`          | Phase 1B: wait_for_editor_state, wait_for_gameobject, wait_for_console | ⚠️ Needs hardening (H-2) |
 
 ### Flow
 
@@ -104,9 +105,16 @@ README.md                        # their readme
 
 ```
 Server/src/services/tools/openclaw/    # our new tool modules (namespaced)
-Server/src/services/tools/wait_for.py  # new file (no upstream collision)
+Server/src/services/tools/wait_for.py  # new file (no upstream collision) — implemented
+Server/src/services/tools/scene_snapshot.py  # new file — implemented
+Server/src/services/tools/ref_resolve.py     # new file — implemented
+Server/src/services/snapshot/          # new package (ref graph, snapshot store) — implemented
 Server/src/services/tools/qa_scenario.py
 Server/src/core/trace.py               # new file
+Server/tests/integration/test_wait_for_tools.py    # new — implemented
+Server/tests/integration/test_scene_snapshot_tools.py  # new — implemented
+Server/tests/test_ref_graph.py         # new — implemented
+MCPForUnity/Editor/Tools/SceneSnapshotCapture.cs  # new file — PENDING (H-1)
 MCPForUnity/Runtime/OpenClaw/          # our runtime bridge (new subdir)
 docs/development/                      # our planning/ADR docs
 scripts/                               # our scripts (new files only)
@@ -121,10 +129,14 @@ These may need minor edits but upstream also touches them:
 Server/src/main.py                  # tool registration (append only)
 Server/src/models/                  # add new models, don't edit existing
 MCPForUnity/Editor/Helpers/         # may need serialization extensions
+MCPForUnity/Editor/Tools/GameObjects/ManageGameObject.cs  # needs get_info action (H-2b)
 MCPForUnity/Runtime/                # upstream has minimal content here
 ```
 
 **Strategy for shared zones:** Prefer new files. If you must edit an existing file, keep the diff under 10 lines and use the `OPENCLAW EXTENSION` markers.
+
+**Known planned patches to upstream files:**
+- `ManageGameObject.cs`: Add `get_info` action case (H-2b) — ~15 lines, use OPENCLAW EXTENSION markers
 
 ---
 
