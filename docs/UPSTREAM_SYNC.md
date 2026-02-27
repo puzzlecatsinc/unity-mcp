@@ -158,8 +158,8 @@ git merge upstream/beta --no-ff -m "upstream sync: merge beta $(date +%Y-%m-%d)"
 
 See the script for details. It:
 1. Fetches upstream
-2. Updates mirror branches (`upstream-beta`, `upstream-main`)
-3. Rebases `main` onto `upstream-beta`
+2. Updates the selected mirror branch (`upstream-beta` by default, `upstream-main` with `--stable`)
+3. Rebases `main` onto that mirror branch
 4. Pushes updated `main` to origin
 5. Reports if conflicts occurred
 

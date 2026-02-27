@@ -64,7 +64,9 @@ echo -e "  local main:                  ${LOCAL_MAIN:0:10}"
 
 if [ "$UPSTREAM_HEAD" = "$LOCAL_MAIN" ]; then
   echo -e "${GREEN}Already up to date.${NC}"
-  [ "$CURRENT_BRANCH" != "$CURRENT_BRANCH" ] && git checkout "$CURRENT_BRANCH"
+  if [ "$CURRENT_BRANCH" != "main" ] && [ "$CURRENT_BRANCH" != "DETACHED" ]; then
+    git checkout "$CURRENT_BRANCH"
+  fi
   exit 0
 fi
 
