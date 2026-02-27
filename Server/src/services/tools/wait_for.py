@@ -289,29 +289,52 @@ async def wait_for_gameobject(
             )
             if isinstance(response, dict) and response.get("success"):
                 resp_data = response.get("data") or {}
-                results = resp_data.get("results") or resp_data.get("instanceIds") or []
+                results = (
+                    resp_data.get("instanceIDs")
+                    or resp_data.get("instanceIds")  # backward compatibility alias
+                    or resp_data.get("instance_ids")  # backward compatibility alias
+                    or resp_data.get("results")  # legacy fallback
+                    or []
+                )
                 if isinstance(results, list) and len(results) > 0:
                     found = True
-                    # If we need active or component checks, fetch object detail
+                    # If we need active/component checks, query supported GameObject resource command.
                     if want_active is not None or component:
                         obj_id = results[0] if isinstance(results[0], (int, str)) else None
                         if obj_id is not None:
                             detail_resp = await unity_transport.send_with_unity_instance(
                                 async_send_command_with_retry,
                                 unity_instance,
-                                "manage_gameobject",
-                                {"action": "get_info", "instanceId": obj_id},
+                                "get_gameobject",
+                                {"instanceID": obj_id},
                             )
                             if isinstance(detail_resp, dict) and detail_resp.get("success"):
                                 detail_data = detail_resp.get("data") or {}
-                                found_active = detail_data.get("activeSelf")
+                                found_active = detail_data.get("active")
+                                if found_active is None:
+                                    # Backward compatibility for older response shape.
+                                    found_active = detail_data.get("activeSelf")
+
                                 if component:
-                                    components_list = detail_data.get("components") or []
-                                    has_component = any(
-                                        (isinstance(c, dict) and c.get("type") == component)
-                                        or (isinstance(c, str) and c == component)
-                                        for c in components_list
+                                    component_types = (
+                                        detail_data.get("componentTypes")
+                                        or detail_data.get("component_types")
+                                        or []
                                     )
+
+                                    if isinstance(component_types, list) and component_types:
+                                        has_component = any(
+                                            str(c).lower() == component.lower()
+                                            for c in component_types
+                                        )
+                                    else:
+                                        # Backward compatibility for older data shape.
+                                        components_list = detail_data.get("components") or []
+                                        has_component = any(
+                                            (isinstance(c, dict) and str(c.get("type", "")).lower() == component.lower())
+                                            or (isinstance(c, str) and c.lower() == component.lower())
+                                            for c in components_list
+                                        )
 
             last_state = {
                 "found": found,

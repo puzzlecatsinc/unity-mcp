@@ -246,7 +246,7 @@ class TestWaitForGameobject:
 
         async def fake_send(send_fn, instance, command, params):
             if command == "find_gameobjects":
-                return {"success": True, "data": {"instanceIds": [12345]}}
+                return {"success": True, "data": {"instanceIDs": [12345]}}
             return {"success": True, "data": {}}
 
         monkeypatch.setattr(ut_mod, "send_with_unity_instance", fake_send)
@@ -254,6 +254,27 @@ class TestWaitForGameobject:
         ctx = DummyContext()
         result = await mod.wait_for_gameobject(
             ctx, selector="Player", timeout_seconds=5, poll_interval_seconds=0.05
+        )
+        assert result["success"] is True
+
+    @pytest.mark.asyncio
+    async def test_legacy_instance_ids_alias_is_tolerated(self, monkeypatch):
+        """Legacy instanceIds key casing should still work for compatibility."""
+        monkeypatch.delenv("PYTEST_CURRENT_TEST", raising=False)
+
+        from services.tools import wait_for as mod
+        import transport.unity_transport as ut_mod
+
+        async def fake_send(send_fn, instance, command, params):
+            if command == "find_gameobjects":
+                return {"success": True, "data": {"instanceIds": [321]}}
+            return {"success": True, "data": {}}
+
+        monkeypatch.setattr(ut_mod, "send_with_unity_instance", fake_send)
+
+        ctx = DummyContext()
+        result = await mod.wait_for_gameobject(
+            ctx, selector="LegacyCase", timeout_seconds=5, poll_interval_seconds=0.05
         )
         assert result["success"] is True
 
@@ -272,8 +293,8 @@ class TestWaitForGameobject:
             call_count += 1
             if command == "find_gameobjects":
                 if call_count < 3:
-                    return {"success": True, "data": {"instanceIds": [123]}}
-                return {"success": True, "data": {"instanceIds": []}}
+                    return {"success": True, "data": {"instanceIDs": [123]}}
+                return {"success": True, "data": {"instanceIDs": []}}
             return {"success": True, "data": {}}
 
         monkeypatch.setattr(ut_mod, "send_with_unity_instance", fake_send)
@@ -295,7 +316,7 @@ class TestWaitForGameobject:
 
         async def fake_send(send_fn, instance, command, params):
             if command == "find_gameobjects":
-                return {"success": True, "data": {"instanceIds": []}}
+                return {"success": True, "data": {"instanceIDs": []}}
             return {"success": True, "data": {}}
 
         monkeypatch.setattr(ut_mod, "send_with_unity_instance", fake_send)
@@ -321,12 +342,15 @@ class TestWaitForGameobject:
             nonlocal call_count
             if command == "find_gameobjects":
                 call_count += 1
-                return {"success": True, "data": {"instanceIds": [100]}}
-            if command == "manage_gameobject":
-                components = []
+                return {"success": True, "data": {"instanceIDs": [100]}}
+            if command == "get_gameobject":
+                component_types = []
                 if call_count >= 2:
-                    components = [{"type": "Rigidbody"}]
-                return {"success": True, "data": {"activeSelf": True, "components": components}}
+                    component_types = ["Transform", "Rigidbody"]
+                return {
+                    "success": True,
+                    "data": {"active": True, "componentTypes": component_types},
+                }
             return {"success": True, "data": {}}
 
         monkeypatch.setattr(ut_mod, "send_with_unity_instance", fake_send)
@@ -356,10 +380,10 @@ class TestWaitForGameobject:
             nonlocal call_count
             if command == "find_gameobjects":
                 call_count += 1
-                return {"success": True, "data": {"instanceIds": [200]}}
-            if command == "manage_gameobject":
+                return {"success": True, "data": {"instanceIDs": [200]}}
+            if command == "get_gameobject":
                 active = call_count >= 3
-                return {"success": True, "data": {"activeSelf": active, "components": []}}
+                return {"success": True, "data": {"active": active, "componentTypes": []}}
             return {"success": True, "data": {}}
 
         monkeypatch.setattr(ut_mod, "send_with_unity_instance", fake_send)
